@@ -145,6 +145,81 @@ code {
     padding-bottom: 0.4rem;
 }
 
+.journal-entry h3,
+.journal-entry h4,
+.journal-entry h5 {
+    color: #5a3e28;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.journal-entry ul,
+.journal-entry ol {
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.journal-entry li {
+    margin-bottom: 0.4rem;
+}
+
+.journal-entry blockquote {
+    margin: 1.5rem 0;
+    padding: 0.8rem 1rem;
+    border-left: 4px solid #c49a6c;
+    background-color: #fdf4e3;
+    color: #5a3e28;
+    font-style: italic;
+}
+
+.journal-entry blockquote p {
+    margin-bottom: 0;
+}
+
+.journal-series {
+    margin-top: 2rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e0c9a0;
+}
+
+.series-label {
+    margin-bottom: 0.75rem;
+    color: #7a5c3c;
+    font-weight: bold;
+}
+
+.series-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.series-link {
+    color: #7a5c3c;
+    text-decoration: none;
+}
+
+.series-link:hover {
+    text-decoration: underline;
+}
+
+.series-link.disabled {
+    color: #b59a7b;
+    pointer-events: none;
+}
+
+.series-list {
+    margin-bottom: 0;
+    padding-left: 1.5rem;
+}
+
+.series-list .current {
+    color: #3a2e20;
+    font-weight: bold;
+}
+
 .entry-date {
     font-size: 0.85rem;
     color: #9a7a5a;

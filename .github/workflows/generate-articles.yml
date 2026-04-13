@@ -1,0 +1,70 @@
+name: Generate blog articles
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - content/articles/**
+      - scripts/Generate-Articles.ps1
+      - Layout/NavMenu.razor
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: article-generation
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Generate pages from markdown
+        shell: pwsh
+        run: ./scripts/Generate-Articles.ps1
+
+      - name: Build application
+        run: dotnet build
+
+      - name: Detect generated changes
+        id: diff
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create pull request
+        if: steps.diff.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          branch="automation/article-sync-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add Pages/Articles Layout/NavMenu.razor
+          git commit -m "Generate blog articles"
+          git push --set-upstream origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Generate blog articles" \
+            --body "Cette PR a ete creee automatiquement apres detection d'un changement dans \`content/articles\`."
