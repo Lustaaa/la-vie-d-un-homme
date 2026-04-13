@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: article-generation
@@ -49,21 +48,12 @@ jobs:
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create pull request
+      - name: Commit generated files
         if: steps.diff.outputs.has_changes == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          branch="automation/article-sync-${GITHUB_RUN_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
           git add Pages/Articles Layout/NavMenu.razor
           git commit -m "Generate blog articles"
-          git push --set-upstream origin "$branch"
-          gh pr create \
-            --base main \
-            --head "$branch" \
-            --title "Generate blog articles" \
-            --body "Cette PR a ete creee automatiquement apres detection d'un changement dans \`content/articles\`."
+          git push origin main
