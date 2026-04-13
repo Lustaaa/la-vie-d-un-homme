@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: article-generation
@@ -48,12 +49,28 @@ jobs:
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Commit generated files
+      - name: Commit and push to a branch
         if: steps.diff.outputs.has_changes == 'true'
+        id: push
         shell: bash
         run: |
+          BRANCH="bot/generate-articles-$(date +%Y%m%d%H%M%S)"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
           git add Pages/Articles Layout/NavMenu.razor
           git commit -m "Generate blog articles"
-          git push origin main
+          git push origin "$BRANCH"
+
+      - name: Create pull request
+        if: steps.diff.outputs.has_changes == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "${{ steps.push.outputs.branch }}" \
+            --title "Generate blog articles" \
+            --body "Pages Razor générées automatiquement à partir des sources Markdown."
