@@ -7,6 +7,8 @@ signature: Juste un homme
 layout: article
 series:
 part:
+correspondance:
+  # Prenom: Ab  (généré automatiquement si absent, à valider en PR)
 ---
 
 Ecris ici ton article en Markdown.
