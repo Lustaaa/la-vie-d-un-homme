@@ -255,7 +255,7 @@ function Parse-FrontMatter {
     return $values
 }
 
-function Parse-WritingMonth {
+function Parse-WritingDate {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Value,
@@ -264,12 +264,13 @@ function Parse-WritingMonth {
         [string] $SourcePath
     )
 
-    if ($Value -notmatch "^(?<month>[^\d]+?)\s+(?<year>\d{4})$") {
-        throw "Le champ writing_month du fichier '$SourcePath' doit être au format 'Avril 2025'."
+    if ($Value -notmatch "^(?:(?<day>1er|\d{1,2})\s+)?(?<month>[^\d]+?)\s+(?<year>\d{4})$") {
+        throw "Le champ writing_date du fichier '$SourcePath' doit être au format 'Avril 2025' ou '1er Novembre 2024'."
     }
 
     $monthName = (Remove-Diacritics $matches["month"]).Trim().ToLowerInvariant()
     $year = [int] $matches["year"]
+    $dayToken = $matches["day"]
     $monthMap = @{
         "janvier" = 1
         "fevrier" = 2
@@ -292,6 +293,7 @@ function Parse-WritingMonth {
     return [pscustomobject]@{
         Year = $year
         Month = $monthMap[$monthName]
+        Day = if ([string]::IsNullOrWhiteSpace($dayToken)) { 1 } elseif ($dayToken -eq "1er") { 1 } else { [int] $dayToken }
     }
 }
 
@@ -317,38 +319,44 @@ function Read-Article {
     $markdown = $normalized.Substring($closingIndex + 5).Trim()
     $metadata = Parse-FrontMatter -Lines ($frontMatterText.Split("`n")) -SourcePath $File.FullName
 
-    foreach ($requiredField in @("title", "writing_month")) {
+    foreach ($requiredField in @("title", "writing_date")) {
         if (-not $metadata.ContainsKey($requiredField) -or [string]::IsNullOrWhiteSpace([string] $metadata[$requiredField])) {
             throw "Le champ '$requiredField' est obligatoire dans '$($File.FullName)'."
         }
     }
 
-    $writingMonth = Parse-WritingMonth -Value ([string] $metadata["writing_month"]) -SourcePath $File.FullName
+    $writingDate = Parse-WritingDate -Value ([string] $metadata["writing_date"]) -SourcePath $File.FullName
     $published = if ($metadata.ContainsKey("published")) { [bool] $metadata["published"] } else { $false }
     $listed = if ($metadata.ContainsKey("listed")) { [bool] $metadata["listed"] } else { $false }
     $signature = if ($metadata.ContainsKey("signature") -and -not [string]::IsNullOrWhiteSpace([string] $metadata["signature"])) { [string] $metadata["signature"] } else { "Juste un homme" }
     $series = if ($metadata.ContainsKey("series") -and -not [string]::IsNullOrWhiteSpace([string] $metadata["series"])) { [string] $metadata["series"] } else { $null }
     $part = if ($metadata.ContainsKey("part")) { [int] $metadata["part"] } else { $null }
+    $layout = if ($metadata.ContainsKey("layout") -and -not [string]::IsNullOrWhiteSpace([string] $metadata["layout"])) { ([string] $metadata["layout"]).Trim().ToLowerInvariant() } else { "article" }
     $title = [string] $metadata["title"]
-    $slug = "{0:D4}-{1:D2}-{2}" -f $writingMonth.Year, $writingMonth.Month, (ConvertTo-SlugPart $title)
+    $slug = "{0:D4}-{1:D2}-{2}" -f $writingDate.Year, $writingDate.Month, (ConvertTo-SlugPart $title)
     $componentName = "GeneratedArticle_{0}" -f (ConvertTo-PascalCase $slug)
+
+    if ($layout -notin @("article", "home")) {
+        throw "Le champ 'layout' du fichier '$($File.FullName)' doit valoir 'article' ou 'home'."
+    }
 
     return [pscustomobject]@{
         SourcePath = $File.FullName
         RelativeSourcePath = [System.IO.Path]::GetRelativePath($script:RepoRoot, $File.FullName)
         Title = $title
-        WritingMonth = [string] $metadata["writing_month"]
+        WritingDate = [string] $metadata["writing_date"]
         Published = $published
         Listed = $listed
         Signature = $signature
         Series = $series
         Part = $part
+        Layout = $layout
         Slug = $slug
         ComponentName = $componentName
         FileName = "$componentName.razor"
         Markdown = $markdown
         HtmlLines = Convert-MarkdownToHtmlLines $markdown
-        SortKey = [datetime]::new($writingMonth.Year, $writingMonth.Month, 1)
+        SortKey = [datetime]::new($writingDate.Year, $writingDate.Month, $writingDate.Day)
     }
 }
 
@@ -422,6 +430,54 @@ function Get-SeriesMarkup {
     return [string[]] $markup.ToArray()
 }
 
+function New-PageLines {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject] $Entry,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Route,
+
+        [Parameter(Mandatory = $true)]
+        [string] $PageTitle,
+
+        [Parameter()]
+        [string[]] $AdditionalMarkup = @()
+    )
+
+    $pageLines = [System.Collections.Generic.List[string]]::new()
+    $pageLines.Add("@page ""$Route""")
+    $pageLines.Add("")
+    $pageLines.Add("<PageTitle>$PageTitle</PageTitle>")
+    $pageLines.Add("")
+    $pageLines.Add("<div class=""journal-cover"">")
+    $pageLines.Add("    <h1>La Vie d'un Homme</h1>")
+    $pageLines.Add("    <p class=""subtitle"">Un journal intime numerique — emotions, anecdotes et fragments du quotidien.</p>")
+    $pageLines.Add("</div>")
+    $pageLines.Add("")
+    $pageLines.Add("<div class=""journal-entry"">")
+    $pageLines.Add("    <p class=""entry-date"">$(Escape-ForRazorHtml $Entry.WritingDate)</p>")
+    $pageLines.Add("    <h2>$(Escape-ForRazorHtml $Entry.Title)</h2>")
+
+    foreach ($htmlLine in $Entry.HtmlLines) {
+        $pageLines.Add($htmlLine)
+    }
+
+    if ($AdditionalMarkup.Length -gt 0) {
+        $pageLines.Add("")
+        foreach ($line in $AdditionalMarkup) {
+            $pageLines.Add($line)
+        }
+    }
+
+    $pageLines.Add("")
+    $pageLines.Add("    <p class=""entry-signature"">— $(Escape-ForRazorHtml $Entry.Signature)</p>")
+    $pageLines.Add("</div>")
+    $pageLines.Add("")
+
+    return $pageLines
+}
+
 function Write-ArticlePages {
     param(
         [Parameter(Mandatory = $true)]
@@ -438,39 +494,25 @@ function Write-ArticlePages {
 
     foreach ($article in $PublishedArticles) {
         $seriesMarkup = @(Get-SeriesMarkup -Article $article -SeriesLookup $SeriesLookup)
-        $pageLines = [System.Collections.Generic.List[string]]::new()
-        $pageLines.Add("@page ""/$($article.Slug)""")
-        $pageLines.Add("")
-        $pageLines.Add("<PageTitle>$(Escape-ForRazorHtml $article.Title) — La Vie d'un Homme</PageTitle>")
-        $pageLines.Add("")
-        $pageLines.Add("<div class=""journal-cover"">")
-        $pageLines.Add("    <h1>La Vie d'un Homme</h1>")
-        $pageLines.Add("    <p class=""subtitle"">Un journal intime numerique — emotions, anecdotes et fragments du quotidien.</p>")
-        $pageLines.Add("</div>")
-        $pageLines.Add("")
-        $pageLines.Add("<div class=""journal-entry"">")
-        $pageLines.Add("    <p class=""entry-date"">$(Escape-ForRazorHtml $article.WritingMonth)</p>")
-        $pageLines.Add("    <h2>$(Escape-ForRazorHtml $article.Title)</h2>")
-
-        foreach ($htmlLine in $article.HtmlLines) {
-            $pageLines.Add($htmlLine)
-        }
-
-        if ($seriesMarkup.Length -gt 0) {
-            $pageLines.Add("")
-            foreach ($line in $seriesMarkup) {
-                $pageLines.Add($line)
-            }
-        }
-
-        $pageLines.Add("")
-        $pageLines.Add("    <p class=""entry-signature"">— $(Escape-ForRazorHtml $article.Signature)</p>")
-        $pageLines.Add("</div>")
-        $pageLines.Add("")
-
+        $pageLines = New-PageLines -Entry $article -Route "/$($article.Slug)" -PageTitle "$(Escape-ForRazorHtml $article.Title) — La Vie d'un Homme" -AdditionalMarkup $seriesMarkup
         $destinationPath = Join-Path $pagesRoot $article.FileName
         Set-Content -Path $destinationPath -Value ($pageLines -join "`n") -Encoding UTF8
     }
+}
+
+function Write-HomePage {
+    param(
+        [Parameter()]
+        [pscustomobject] $HomeEntry
+    )
+
+    if ($null -eq $HomeEntry) {
+        return
+    }
+
+    $destinationPath = Join-Path $script:RepoRoot "Pages\Home.razor"
+    $pageLines = New-PageLines -Entry $HomeEntry -Route "/" -PageTitle "La Vie d'un Homme"
+    Set-Content -Path $destinationPath -Value ($pageLines -join "`n") -Encoding UTF8
 }
 
 function Update-NavMenu {
@@ -530,7 +572,20 @@ foreach ($articleFile in $articleFiles) {
     $articles.Add((Read-Article -File $articleFile))
 }
 
-$groupedBySlug = $articles | Group-Object -Property Slug
+$homeEntries = @($articles | Where-Object { $_.Layout -eq "home" -and $_.Published })
+if ($homeEntries.Length -gt 1) {
+    throw "Un seul fichier publie avec 'layout: home' est autorise."
+}
+
+$homeEntry = if ($homeEntries.Length -eq 1) { $homeEntries[0] } else { $null }
+$articleEntries = [System.Collections.Generic.List[object]]::new()
+foreach ($article in $articles) {
+    if ($article.Layout -eq "article") {
+        $articleEntries.Add($article)
+    }
+}
+
+$groupedBySlug = $articleEntries | Group-Object -Property Slug
 foreach ($group in $groupedBySlug) {
     if ($group.Count -le 1) {
         continue
@@ -550,7 +605,7 @@ foreach ($group in $groupedBySlug) {
 }
 
 $publishedArticles = [System.Collections.Generic.List[object]]::new()
-foreach ($article in ($articles | Sort-Object -Property @{ Expression = { $_.SortKey }; Descending = $true }, @{ Expression = { $_.Title } })) {
+foreach ($article in ($articleEntries | Sort-Object -Property @{ Expression = { $_.SortKey }; Descending = $true }, @{ Expression = { $_.Title } })) {
     if ($article.Published) {
         $publishedArticles.Add($article)
     }
@@ -586,4 +641,5 @@ foreach ($article in $publishedArticles) {
 }
 
 Write-ArticlePages -PublishedArticles $publishedArticles -SeriesLookup $seriesLookup
+Write-HomePage -HomeEntry $homeEntry
 Update-NavMenu -ListedArticles $listedArticles

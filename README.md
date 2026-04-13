@@ -22,10 +22,11 @@ La **source de vérité** est maintenant le dossier `content/articles/`.
    ```md
    ---
    title: Mon titre
-   writing_month: Avril 2025
+   writing_date: Avril 2025
    published: false
    listed: false
    signature: Juste un homme
+   layout: article
    series:
    part:
    ---
@@ -50,10 +51,11 @@ La **source de vérité** est maintenant le dossier `content/articles/`.
 | Champ | Obligatoire | Type | Défaut | Rôle |
 |------|------|------|------|------|
 | `title` | Oui | Texte | — | Titre affiché sur la page et dans le menu |
-| `writing_month` | Oui | Texte | — | Mois d'écriture déjà formaté en français, par exemple `Avril 2025` |
+| `writing_date` | Oui | Texte | — | Date éditoriale en français, par exemple `Avril 2025`, `10 Novembre 2024` ou `1er Novembre 2024` |
 | `published` | Non | Booléen | `false` | Si `false`, aucune page n'est générée |
 | `listed` | Non | Booléen | `false` | Si `true`, l'article apparaît dans le menu |
 | `signature` | Non | Texte | `Juste un homme` | Signature affichée en bas de l'article |
+| `layout` | Non | Texte | `article` | `article` pour une page de blog classique, `home` pour générer `Pages/Home.razor` |
 | `series` | Non | Texte | vide | Nom d'une suite d'articles |
 | `part` | Non | Nombre | vide | Ordre de l'article dans la série |
 
@@ -62,7 +64,9 @@ La **source de vérité** est maintenant le dossier `content/articles/`.
 - `published: false` : l'article reste un brouillon, aucune page `.razor` ne doit exister.
 - `published: true` + `listed: false` : la page est générée mais n'apparaît pas dans le menu.
 - `published: true` + `listed: true` : la page est générée et ajoutée au menu.
-- Le slug de l'URL est généré automatiquement à partir du titre et du mois/année, sous la forme `yyyy-MM-titre`.
+- Le slug de l'URL est généré automatiquement à partir du titre et de la date éditoriale, sous la forme `yyyy-MM-titre`.
+- `writing_date` accepte soit un mois au format `Avril 2025`, soit une date plus précise comme `10 Novembre 2024` ou `1er Novembre 2024`.
+- `layout: home` génère `Pages/Home.razor` et n'ajoute pas ce contenu dans la liste des articles.
 - Les fichiers dans `content/articles/_templates/` servent de modèles et ne sont jamais publiés.
 
 ---
@@ -90,7 +94,7 @@ Pour relier plusieurs textes entre eux :
 ```md
 ---
 title: Partie 2
-writing_month: Mai 2025
+writing_date: Mai 2025
 published: true
 listed: true
 series: Une histoire
@@ -139,6 +143,31 @@ Le workflow `.github/workflows/generate-articles.yml` :
 4. ouvre une pull request si des fichiers générés ont changé
 
 Le workflow de déploiement GitHub Pages continue ensuite à publier l'application une fois les fichiers générés fusionnés.
+
+---
+
+### 🏠 Générer la page d'accueil depuis Markdown
+
+Vous pouvez aussi piloter l'accueil depuis un Markdown source, par exemple :
+
+```md
+---
+title: Bonjour
+writing_date: 1er Novembre 2024
+published: true
+listed: false
+signature: L'auteur
+layout: home
+---
+
+Votre texte d'accueil en Markdown.
+```
+
+Quand `layout: home` est utilisé :
+
+- le générateur remplace `Pages/Home.razor`
+- le contenu ne devient pas un article classique dans `Pages/Articles/`
+- la page reste stylée comme le reste du journal
 
 ---
 

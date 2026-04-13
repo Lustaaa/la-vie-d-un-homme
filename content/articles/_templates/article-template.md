@@ -1,9 +1,10 @@
 ---
 title: Mon titre
-writing_month: Avril 2025
+writing_date: Avril 2025
 published: false
 listed: false
 signature: Juste un homme
+layout: article
 series:
 part:
 ---
