@@ -4,13 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - App.razor
-      - Program.cs
-      - LaVieApp.csproj
-      - Layout/**
-      - Pages/**
-      - wwwroot/**
 
 permissions:
   contents: read
