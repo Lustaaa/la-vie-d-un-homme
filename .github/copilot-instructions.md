@@ -14,3 +14,4 @@
   1. `pwsh -File ./scripts/Generate-Articles.ps1`
   2. `dotnet build`
 - Le build local peut echouer si la restauration NuGet ne peut pas joindre `https://api.nuget.org/v3/index.json`. Si cela arrive, ne pas en deduire que le code est invalide : noter clairement le blocage reseau.
+- Les instructions detaillees pour l'agent articles sont dans `AGENTS.md` a la racine du projet.
