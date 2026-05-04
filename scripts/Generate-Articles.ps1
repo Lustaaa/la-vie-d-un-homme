@@ -624,7 +624,7 @@ foreach ($article in $publishedArticles) {
     $seriesLookup[$article.Series].Add($article)
 }
 
-foreach ($seriesName in $seriesLookup.Keys) {
+foreach ($seriesName in @($seriesLookup.Keys)) {
     $sortedSeries = $seriesLookup[$seriesName] |
         Sort-Object -Property @{ Expression = { if ($null -ne $_.Part) { $_.Part } else { [int]::MaxValue } } }, @{ Expression = { $_.SortKey } }, @{ Expression = { $_.Title } }
     $seriesLookup[$seriesName] = [System.Collections.Generic.List[object]]::new()
